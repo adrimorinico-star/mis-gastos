@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mis Gastos Diarios</title>
+    <!-- Tailwind CSS para el diseño estilo App -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Phosphor Icons para los íconos -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <style>
+        /* Ocultar barra de desplazamiento para un look más de App móvil */
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+        /* Transiciones suaves */
+        .fade-in {
+            animation: fadeIn 0.3s ease-in-out;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body class="bg-slate-100 flex justify-center h-screen md:py-8 font-sans antialiased text-slate-800">
+
+    <!-- Contenedor Principal (Simula la pantalla de un celular) -->
+    <div class="bg-white w-full max-w-md md:rounded-3xl shadow-2xl flex flex-col h-full md:h-auto md:max-h-[850px] overflow-hidden relative">
+        
+        <!-- Cabecera de la App -->
+        <header class="bg-indigo-600 text-white p-6 rounded-b-3xl shadow-md z-10 relative">
+            <div class="flex justify-between items-center mb-4">
+                <h1 class="text-xl font-bold tracking-wide">Mis Gastos</h1>
+                <button onclick="exportToCSV()" class="p-2 bg-indigo-500 hover:bg-indigo-400 rounded-full transition-colors" title="Exportar a CSV">
+                    <i class="ph ph-download-simple text-xl"></i>
+                </button>
+            </div>
+            <div>
+                <p class="text-indigo-200 text-sm font-medium">Total Acumulado</p>
+                <h2 class="text-4xl font-extrabold mt-1" id="totalAmount">$0.00</h2>
+            </div>
+        </header>
+
+        <!-- Área desplazable principal -->
+        <main class="flex-1 overflow-y-auto no-scrollbar p-6 bg-slate-50">
+            
+            <!-- Formulario de Ingreso -->
+            <section class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 mb-8">
+                <h3 class="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4">Nuevo Gasto</h3>
+                <form id="expenseForm" class="space-y-4">
+                    
+                    <!-- Fecha y Monto en la misma fila -->
+                    <div class="flex gap-4">
+                        <div class="flex-1">
+                            <label class="block text-xs font-semibold text-slate-500 mb-1">Fecha</label>
+                            <input type="date" id="dateInput" required 
+                                class="w-full bg-slate-100 border-none rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all">
+                        </div>
+                        <div class="flex-1">
+                            <label class="block text-xs font-semibold text-slate-500 mb-1">Monto ($)</label>
+                            <input type="number" id="amountInput" step="0.01" min="0" placeholder="0.00" required
+                                class="w-full bg-slate-100 border-none rounded-xl px-4 py-3 text-sm font-bold text-indigo-700 focus:ring-2 focus:ring-indigo-500 outline-none transition-all">
+                        </div>
+                    </div>
+
+                    <!-- Descripción -->
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-500 mb-1">Descripción</label>
+                        <input type="text" id="descInput" placeholder="Ej. Café, Gasolina, Cine..." required
+                            class="w-full bg-slate-100 border-none rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all">
+                    </div>
+
+                    <!-- Categoría (Lista estática) -->
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-500 mb-1">Categoría</label>
+                        <select id="categoryInput" required
+                            class="w-full bg-slate-100 border-none rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all appearance-none">
+                            <option value="" disabled selected>Selecciona una categoría</option>
+                            <option value="Alimentación">🛒 Alimentación</option>
+                            <option value="Transporte">🚌 Transporte</option>
+                            <option value="Vivienda">🏠 Vivienda</option>
+                            <option value="Servicios">💡 Servicios</option>
+                            <option value="Ocio">🎬 Ocio & Entretenimiento</option>
+                            <option value="Salud">💊 Salud</option>
+                            <option value="Ropa">🛍️ Ropa & Compras</option>
+                            <option value="Otros">❓ Otros</option>
+                        </select>
+                    </div>
+
+                    <!-- Botones Guardar / Cancelar -->
+                    <div class="flex gap-2">
+                        <button type="submit" id="submitBtn"
+                            class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3.5 rounded-xl shadow-lg shadow-indigo-200 transition-all active:scale-95 flex justify-center items-center gap-2">
+                            <i class="ph ph-plus-circle text-lg"></i>
+                            <span>Añadir Gasto</span>
+                        </button>
+                        <button type="button" id="cancelBtn" onclick="cancelEdit()"
+                            class="hidden bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold py-3.5 px-4 rounded-xl transition-all active:scale-95 flex justify-center items-center" title="Cancelar edición">
+                            <i class="ph ph-x text-lg"></i>
+                        </button>
+                    </div>
+                </form>
+            </section>
+
+            <!-- Lista de Gastos -->
+            <section>
+                <div class="flex justify-between items-end mb-4 px-1">
+                    <h3 class="text-sm font-bold text-slate-400 uppercase tracking-wider">Historial</h3>
+                    <span id="entryCount" class="text-xs font-semibold text-slate-400 bg-slate-200 px-2 py-1 rounded-md">0 registros</span>
+                </div>
+                
+                <div id="expenseList" class="space-y-3 pb-8">
+                    <!-- Los gastos se inyectarán aquí mediante JS -->
+                </div>
+                
+                <!-- Estado vacío -->
+                <div id="emptyState" class="hidden flex flex-col items-center justify-center py-10 text-slate-400">
+                    <i class="ph ph-receipt text-6xl mb-3 opacity-50"></i>
+                    <p class="text-sm">No hay gastos registrados aún.</p>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Lógica de la Aplicación -->
+    <script>
+        // --- CONFIGURACIÓN DE GOOGLE SHEETS ---
+        // Pega aquí la URL que te dio Google Apps Script entre las comillas simples
+        const GOOGLE_APP_SCRIPT_URL = ''; 
+
+        // Inicializar datos desde LocalStorage (Base de datos plana del navegador)
+        let expenses = JSON.parse(localStorage.getItem('expensesDB')) || [];
+        let editingId = null; // Variable para saber si estamos editando
+
+        // Referencias al DOM
+        const form = document.getElementById('expenseForm');
+        const dateInput = document.getElementById('dateInput');
+        const amountInput = document.getElementById('amountInput');
+        const descInput = document.getElementById('descInput');
+        const categoryInput = document.getElementById('categoryInput');
+        const expenseList = document.getElementById('expenseList');
+        const totalAmountEl = document.getElementById('totalAmount');
+        const emptyState = document.getElementById('emptyState');
+        const entryCount = document.getElementById('entryCount');
+        const submitBtn = document.getElementById('submitBtn');
+        const cancelBtn = document.getElementById('cancelBtn');
+
+        // Establecer fecha de hoy por defecto al cargar
+        const today = new Date().toISOString().split('T')[0];
+        dateInput.value = today;
+
+        // Formateador de moneda
+        const formatter = new Intl.NumberFormat('es-AR', {
+            style: 'currency',
+            currency: 'ARS', // Puedes cambiar esto a USD, EUR, MXN, etc.
+            minimumFractionDigits: 2
+        });
+
+        // Configuración de colores e iconos para categorías
+        const categoryConfig = {
+            "Alimentación": { icon: "ph-shopping-cart", color: "text-emerald-500", bg: "bg-emerald-100" },
+            "Transporte": { icon: "ph-bus", color: "text-blue-500", bg: "bg-blue-100" },
+            "Vivienda": { icon: "ph-house", color: "text-orange-500", bg: "bg-orange-100" },
+            "Servicios": { icon: "ph-lightning", color: "text-yellow-500", bg: "bg-yellow-100" },
+            "Ocio": { icon: "ph-popcorn", color: "text-purple-500", bg: "bg-purple-100" },
+            "Salud": { icon: "ph-pill", color: "text-red-500", bg: "bg-red-100" },
+            "Ropa": { icon: "ph-bag", color: "text-pink-500", bg: "bg-pink-100" },
+            "Otros": { icon: "ph-dots-three-circle", color: "text-slate-500", bg: "bg-slate-200" }
+        };
+
+        // Escuchar el evento de envío del formulario
+        form.addEventListener('submit', function(e) {
+            e.preventDefault();
+
+            if (editingId) {
+                // Modo Edición: Actualizar gasto existente
+                const index = expenses.findIndex(exp => exp.id === editingId);
+                if (index !== -1) {
+                    expenses[index].date = dateInput.value;
+                    expenses[index].amount = parseFloat(amountInput.value);
+                    expenses[index].description = descInput.value;
+                    expenses[index].category = categoryInput.value;
+                    
+                    // Sincronizar edición con Google Sheets
+                    syncToGoogleSheets('edit', expenses[index]);
+                }
+                cancelEdit(); // Salir del modo edición
+            } else {
+                // Modo Creación: Crear el objeto del gasto nuevo
+                const newExpense = {
+                    id: crypto.randomUUID(), // Generar un ID único
+                    date: dateInput.value,
+                    amount: parseFloat(amountInput.value),
+                    description: descInput.value,
+                    category: categoryInput.value,
+                    timestamp: new Date().getTime()
+                };
+
+                // Añadir al array de gastos (añadir al principio)
+                expenses.unshift(newExpense);
+                
+                // Sincronizar nuevo gasto con Google Sheets
+                syncToGoogleSheets('add', newExpense);
+                
+                // Limpiar inputs (manteniendo la fecha)
+                amountInput.value = '';
+                descInput.value = '';
+                categoryInput.value = '';
+                descInput.focus();
+            }
+
+            // Guardar en la "base plana" (LocalStorage)
+            saveData();
+
+            // Actualizar la interfaz
+            renderExpenses();
+        });
+
+        // Función para guardar en LocalStorage
+        function saveData() {
+            localStorage.setItem('expensesDB', JSON.stringify(expenses));
+        }
+
+        // Función para sincronizar con Google Sheets automáticamente en segundo plano
+        function syncToGoogleSheets(action, expenseData) {
+            if (!GOOGLE_APP_SCRIPT_URL) return; // Si no pusiste tu URL arriba, se ignora
+
+            const payload = {
+                action: action,
+                data: expenseData
+            };
+
+            // Usamos fetch con 'no-cors' para mandar los datos a Google de forma directa
+            fetch(GOOGLE_APP_SCRIPT_URL, {
+                method: 'POST',
+                mode: 'no-cors',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(payload)
+            }).catch(err => console.error("Error al conectar con Sheets:", err));
+        }
+
+        // Función para eliminar un gasto
+        function deleteExpense(id) {
+            if(confirm('¿Estás seguro de eliminar este registro?')) {
+                expenses = expenses.filter(expense => expense.id !== id);
+                saveData();
+                renderExpenses();
+                
+                // Sincronizar eliminación con Google Sheets
+                syncToGoogleSheets('delete', { id: id });
+            }
+        }
+
+        // Función para cargar un gasto en el formulario para editar
+        function editExpense(id) {
+            const expense = expenses.find(e => e.id === id);
+            if (!expense) return;
+
+            editingId = id;
+            dateInput.value = expense.date;
+            amountInput.value = expense.amount;
+            descInput.value = expense.description;
+            categoryInput.value = expense.category;
+
+            // Cambiar la apariencia del botón principal a verde
+            submitBtn.classList.remove('bg-indigo-600', 'hover:bg-indigo-700', 'shadow-indigo-200');
+            submitBtn.classList.add('bg-emerald-600', 'hover:bg-emerald-700', 'shadow-emerald-200');
+            submitBtn.innerHTML = '<i class="ph ph-check-circle text-lg"></i><span>Actualizar Gasto</span>';
+            
+            // Mostrar el botón de cancelar
+            cancelBtn.classList.remove('hidden');
+
+            // Hacer scroll hacia el formulario para móviles
+            document.querySelector('main').scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        // Función para cancelar la edición
+        function cancelEdit() {
+            editingId = null;
+            
+            // Limpiar formulario y restaurar fecha de hoy
+            amountInput.value = '';
+            descInput.value = '';
+            categoryInput.value = '';
+            dateInput.value = new Date().toISOString().split('T')[0];
+
+            // Restaurar la apariencia del botón principal a azul
+            submitBtn.classList.remove('bg-emerald-600', 'hover:bg-emerald-700', 'shadow-emerald-200');
+            submitBtn.classList.add('bg-indigo-600', 'hover:bg-indigo-700', 'shadow-indigo-200');
+            submitBtn.innerHTML = '<i class="ph ph-plus-circle text-lg"></i><span>Añadir Gasto</span>';
+            
+            // Ocultar botón de cancelar
+            cancelBtn.classList.add('hidden');
+        }
+
+        // Función para renderizar la lista y actualizar totales
+        function renderExpenses() {
+            // Limpiar lista actual
+            expenseList.innerHTML = '';
+            
+            let total = 0;
+
+            if (expenses.length === 0) {
+                emptyState.classList.remove('hidden');
+            } else {
+                emptyState.classList.add('hidden');
+            }
+
+            entryCount.textContent = `${expenses.length} registro${expenses.length !== 1 ? 's' : ''}`;
+
+            // Ordenar por fecha (más reciente primero)
+            const sortedExpenses = [...expenses].sort((a, b) => new Date(b.date) - new Date(a.date));
+
+            sortedExpenses.forEach(expense => {
+                total += expense.amount;
+
+                // Formatear fecha a algo legible (ej: 15 Oct, 2023)
+                const dateObj = new Date(expense.date + 'T00:00:00'); // Evitar problema de zona horaria
+                const dateStr = dateObj.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' });
+
+                // Obtener configuración visual de la categoría
+                const catConf = categoryConfig[expense.category] || categoryConfig["Otros"];
+
+                // Crear elemento de la lista
+                const item = document.createElement('div');
+                item.className = 'fade-in bg-white p-4 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-4 group';
+                
+                item.innerHTML = `
+                    <div class="w-12 h-12 rounded-xl flex items-center justify-center shrink-0 ${catConf.bg} ${catConf.color}">
+                        <i class="ph ${catConf.icon} text-2xl"></i>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <h4 class="font-bold text-slate-800 truncate">${expense.description}</h4>
+                        <div class="flex items-center gap-2 text-xs text-slate-500 mt-1">
+                            <span class="bg-slate-100 px-2 py-0.5 rounded-md font-medium">${expense.category}</span>
+                            <span>•</span>
+                            <span>${dateStr}</span>
+                        </div>
+                    </div>
+                    <div class="text-right shrink-0 flex flex-col items-end justify-center">
+                        <p class="font-bold text-slate-800">${formatter.format(expense.amount)}</p>
+                        <div class="flex gap-3 mt-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button onclick="editExpense('${expense.id}')" class="text-indigo-500 hover:text-indigo-700 text-xs font-semibold flex items-center gap-1" title="Editar">
+                                <i class="ph ph-pencil-simple text-sm"></i>
+                            </button>
+                            <button onclick="deleteExpense('${expense.id}')" class="text-red-400 hover:text-red-600 text-xs font-semibold flex items-center gap-1" title="Borrar">
+                                <i class="ph ph-trash text-sm"></i>
+                            </button>
+                        </div>
+                    </div>
+                `;
+                
+                expenseList.appendChild(item);
+            });
+
+            // Actualizar total
+            totalAmountEl.textContent = formatter.format(total);
+        }
+
+        // Función para exportar la base plana a un archivo CSV
+        function exportToCSV() {
+            if (expenses.length === 0) {
+                alert("No hay datos para exportar.");
+                return;
+            }
+
+            // Cabeceras del CSV
+            let csvContent = "Fecha,Categoria,Descripcion,Monto\n";
+
+            // Recorrer los datos y formatearlos
+            expenses.forEach(row => {
+                // Escapar comillas dobles en la descripción si las hubiera
+                const desc = `"${row.description.replace(/"/g, '""')}"`;
+                const rowString = `${row.date},${row.category},${desc},${row.amount}`;
+                csvContent += rowString + "\n";
+            });
+
+            // Crear un objeto Blob con el contenido
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            
+            // Crear un enlace de descarga invisible y hacer clic en él
+            const link = document.createElement("a");
+            const url = URL.createObjectURL(blob);
+            link.setAttribute("href", url);
+            link.setAttribute("download", `Mis_Gastos_${new Date().toISOString().split('T')[0]}.csv`);
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        // Renderizado inicial al cargar la página
+        renderExpenses();
+    </script>
+</body>
+</html>
