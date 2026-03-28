@@ -8,6 +8,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <style>
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
@@ -24,7 +25,6 @@
             <div class="flex justify-between items-center mb-4">
                 <h1 class="text-xl font-bold tracking-wide">Mis Gastos</h1>
                 <div class="flex gap-2">
-                    <!-- Botón de instalación ahora visible por defecto (se quitó la clase 'hidden') -->
                     <button id="installAppBtn" class="p-2 bg-emerald-500 hover:bg-emerald-400 rounded-full transition-colors relative" title="Instalar Aplicación">
                         <i class="ph ph-download text-xl"></i>
                     </button>
@@ -32,9 +32,28 @@
                         <i id="syncIcon" class="ph ph-arrows-clockwise text-xl"></i>
                         <span id="syncBadge" class="hidden absolute top-0 right-0 w-3 h-3 bg-red-400 rounded-full border-2 border-indigo-600"></span>
                     </button>
-                    <button onclick="exportToCSV()" class="p-2 bg-indigo-500 hover:bg-indigo-400 rounded-full transition-colors" title="Exportar a CSV">
-                        <i class="ph ph-download-simple text-xl"></i>
-                    </button>
+                    
+                    <div class="relative">
+                        <button onclick="toggleExportMenu()" class="p-2 bg-indigo-500 hover:bg-indigo-400 rounded-full transition-colors" title="Opciones de Exportación">
+                            <i class="ph ph-export text-xl"></i>
+                        </button>
+                        
+                        <div id="exportMenu" class="hidden absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-xl z-50 border border-slate-100 overflow-hidden fade-in text-slate-800">
+                            <button onclick="exportToCSV()" class="w-full text-left px-4 py-3 text-sm hover:bg-indigo-50 hover:text-indigo-700 flex items-center gap-2 transition-colors">
+                                <i class="ph ph-file-csv text-lg"></i> Archivo CSV
+                            </button>
+                            <button onclick="exportToJSON()" class="w-full text-left px-4 py-3 text-sm hover:bg-indigo-50 hover:text-indigo-700 flex items-center gap-2 transition-colors border-t border-slate-50">
+                                <i class="ph ph-file-code text-lg"></i> Archivo JSON
+                            </button>
+                            <button onclick="exportToPDF()" class="w-full text-left px-4 py-3 text-sm hover:bg-indigo-50 hover:text-indigo-700 flex items-center gap-2 transition-colors border-t border-slate-50">
+                                <i class="ph ph-file-pdf text-lg"></i> Resumen PDF
+                            </button>
+                            <button onclick="openShareModal()" class="w-full text-left px-4 py-3 text-sm hover:bg-indigo-50 hover:text-indigo-700 flex items-center gap-2 transition-colors border-t border-slate-50">
+                                <i class="ph ph-share-network text-lg"></i> Enviar por App...
+                            </button>
+                        </div>
+                    </div>
+
                 </div>
             </div>
             <div>
@@ -48,10 +67,42 @@
             </div>
         </header>
 
-        <!-- Mensaje modal personalizado para cuando se intenta instalar en vista previa -->
         <div id="customAlert" class="hidden absolute top-24 right-4 bg-slate-800 text-white text-sm p-4 rounded-xl shadow-2xl z-50 fade-in border border-slate-700 max-w-[250px]">
             <p class="mb-3"><i class="ph ph-info text-indigo-400 text-lg align-middle mr-1"></i>Para instalar la app de forma real, debes abrirla desde tu enlace seguro de publicación (ej. GitHub Pages).</p>
             <button onclick="document.getElementById('customAlert').classList.add('hidden')" class="w-full bg-slate-700 hover:bg-slate-600 py-1.5 rounded-lg font-semibold transition-colors">Entendido</button>
+        </div>
+
+        <!-- NUEVO: Modal de Opciones para Compartir -->
+        <div id="shareModal" class="hidden fixed inset-0 bg-slate-900/40 z-[60] flex items-center justify-center p-4 fade-in">
+            <div class="bg-white rounded-2xl shadow-xl w-full max-w-sm overflow-hidden">
+                <div class="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                    <h3 class="font-bold text-slate-800">Compartir como...</h3>
+                    <button onclick="closeShareModal()" class="text-slate-400 hover:text-slate-600 bg-slate-200 hover:bg-slate-300 p-1 rounded-md transition-colors"><i class="ph ph-x text-lg"></i></button>
+                </div>
+                <div class="p-4 space-y-3">
+                    <button onclick="executeShare('pdf')" class="w-full flex items-center gap-4 p-3 rounded-xl border border-slate-100 hover:bg-red-50 hover:border-red-200 transition-all text-left group">
+                        <div class="bg-red-100 p-2 rounded-lg text-red-500 group-hover:scale-110 transition-transform"><i class="ph ph-file-pdf text-2xl"></i></div>
+                        <div>
+                            <p class="font-bold text-slate-700 text-sm">Documento PDF</p>
+                            <p class="text-xs text-slate-500">Reporte visual formateado</p>
+                        </div>
+                    </button>
+                    <button onclick="executeShare('csv')" class="w-full flex items-center gap-4 p-3 rounded-xl border border-slate-100 hover:bg-emerald-50 hover:border-emerald-200 transition-all text-left group">
+                        <div class="bg-emerald-100 p-2 rounded-lg text-emerald-500 group-hover:scale-110 transition-transform"><i class="ph ph-file-csv text-2xl"></i></div>
+                        <div>
+                            <p class="font-bold text-slate-700 text-sm">Archivo CSV</p>
+                            <p class="text-xs text-slate-500">Para Excel o Google Sheets</p>
+                        </div>
+                    </button>
+                    <button onclick="executeShare('txt')" class="w-full flex items-center gap-4 p-3 rounded-xl border border-slate-100 hover:bg-indigo-50 hover:border-indigo-200 transition-all text-left group">
+                        <div class="bg-indigo-100 p-2 rounded-lg text-indigo-500 group-hover:scale-110 transition-transform"><i class="ph ph-file-text text-2xl"></i></div>
+                        <div>
+                            <p class="font-bold text-slate-700 text-sm">Respaldo de Datos</p>
+                            <p class="text-xs text-slate-500">Datos nativos (TXT) para WhatsApp</p>
+                        </div>
+                    </button>
+                </div>
+            </div>
         </div>
 
         <main class="flex-1 overflow-y-auto no-scrollbar p-6 bg-slate-50">
@@ -108,12 +159,18 @@
             <section>
                 <div class="flex justify-between items-end mb-4 px-1">
                     <h3 class="text-sm font-bold text-slate-400 uppercase tracking-wider">Historial</h3>
-                    <span id="entryCount" class="text-xs font-semibold text-slate-400 bg-slate-200 px-2 py-1 rounded-md">0 registros</span>
+                    <!-- NUEVO: Filtro Mensual -->
+                    <div class="flex items-center gap-2">
+                        <select id="monthFilter" onchange="renderExpenses()" class="text-xs font-semibold text-slate-600 bg-slate-200 px-2 py-1 rounded-md outline-none cursor-pointer max-w-[120px] truncate">
+                            <option value="all">Todos</option>
+                        </select>
+                        <span id="entryCount" class="text-xs font-semibold text-slate-400 bg-slate-200 px-2 py-1 rounded-md">0</span>
+                    </div>
                 </div>
                 <div id="expenseList" class="space-y-3 pb-8"></div>
                 <div id="emptyState" class="hidden flex flex-col items-center justify-center py-10 text-slate-400">
                     <i class="ph ph-receipt text-6xl mb-3 opacity-50"></i>
-                    <p class="text-sm">No hay gastos registrados aún.</p>
+                    <p class="text-sm">No hay gastos en este periodo.</p>
                 </div>
             </section>
         </main>
@@ -127,18 +184,18 @@
         let editingId = null; 
         let db; 
         let isSyncing = false;
-        let expenseChart; // Variable para la instancia del gráfico (NUEVO)
+        let expenseChart;
+        let lastKnownMonthsStr = ""; // Para rastrear cambios en las opciones del filtro
 
         // Referencias DOM
         const form = document.getElementById('expenseForm');
         const [dateInput, amountInput, descInput, categoryInput] = ['dateInput', 'amountInput', 'descInput', 'categoryInput'].map(id => document.getElementById(id));
         const [expenseList, totalAmountEl, emptyState, entryCount, submitBtn, cancelBtn] = ['expenseList', 'totalAmount', 'emptyState', 'entryCount', 'submitBtn', 'cancelBtn'].map(id => document.getElementById(id));
-        const [syncIcon, syncBadge, connectionStatus, installAppBtn, chartSection] = ['syncIcon', 'syncBadge', 'connectionStatus', 'installAppBtn', 'chartSection'].map(id => document.getElementById(id));
+        const [syncIcon, syncBadge, connectionStatus, installAppBtn, chartSection, exportMenu, monthFilter] = ['syncIcon', 'syncBadge', 'connectionStatus', 'installAppBtn', 'chartSection', 'exportMenu', 'monthFilter'].map(id => document.getElementById(id));
 
         dateInput.value = new Date().toISOString().split('T')[0];
         const formatter = new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', minimumFractionDigits: 2 });
         
-        // Configuración visual de categorías (Colores hexadecimales añadidos para Chart.js)
         const categoryConfig = {
             "Alimentación": { icon: "ph-shopping-cart", color: "text-emerald-500", bg: "bg-emerald-100", hex: "#10b981" },
             "Transporte": { icon: "ph-bus", color: "text-blue-500", bg: "bg-blue-100", hex: "#3b82f6" },
@@ -287,13 +344,55 @@
             cancelBtn.classList.add('hidden');
         }
 
+        // --- NUEVO: FUNCIONALIDAD DE FILTRO ---
+        function updateFilterOptions() {
+            const currentValue = monthFilter.value;
+            // Obtener meses únicos en formato "YYYY-MM"
+            const uniqueMonths = [...new Set(expenses.filter(e => !e.isDeleted).map(e => e.date.substring(0, 7)))].sort().reverse();
+            
+            const newMonthsStr = uniqueMonths.join(',');
+            if (lastKnownMonthsStr === newMonthsStr) return; // Evitar redibujar si no hay meses nuevos
+            lastKnownMonthsStr = newMonthsStr;
+
+            monthFilter.innerHTML = '<option value="all">Todos los meses</option>';
+            
+            uniqueMonths.forEach(month => {
+                const [yyyy, mm] = month.split('-');
+                const dateObj = new Date(yyyy, mm - 1);
+                const monthName = dateObj.toLocaleDateString('es-ES', { month: 'short', year: 'numeric' });
+                const formattedName = monthName.charAt(0).toUpperCase() + monthName.slice(1);
+                
+                const option = document.createElement('option');
+                option.value = month;
+                option.textContent = formattedName;
+                monthFilter.appendChild(option);
+            });
+            
+            // Mantener la selección actual si sigue existiendo
+            if (uniqueMonths.includes(currentValue)) {
+                monthFilter.value = currentValue;
+            } else {
+                monthFilter.value = 'all';
+            }
+        }
+
+        function getFilteredExpenses() {
+            const selectedMonth = monthFilter.value;
+            return expenses.filter(e => {
+                if (e.isDeleted) return false;
+                if (selectedMonth !== 'all' && !e.date.startsWith(selectedMonth)) return false;
+                return true;
+            });
+        }
+
         // --- 6. RENDERIZADO VISUAL Y GRÁFICOS ---
         function renderExpenses() {
+            updateFilterOptions(); // Actualizar las opciones del filtro por si hay datos nuevos
+            
             expenseList.innerHTML = '';
             let total = 0;
-            const visibleExpenses = expenses.filter(e => !e.isDeleted);
+            const visibleExpenses = getFilteredExpenses(); // Usar los datos filtrados
             
-            // Gestión de Empty State y Sección de Gráfico
             if (visibleExpenses.length === 0) {
                 emptyState.classList.remove('hidden');
                 chartSection.classList.add('hidden');
@@ -303,7 +402,7 @@
                 updateChart(visibleExpenses);
             }
 
-            entryCount.textContent = `${visibleExpenses.length} registro${visibleExpenses.length !== 1 ? 's' : ''}`;
+            entryCount.textContent = `${visibleExpenses.length}`;
             const sortedExpenses = [...visibleExpenses].sort((a, b) => new Date(b.date) - new Date(a.date));
 
             sortedExpenses.forEach(expense => {
@@ -397,8 +496,23 @@
             }
         }
 
+        // --- 7. LÓGICA DE EXPORTACIÓN Y MENÚ ---
+        
+        function toggleExportMenu() {
+            exportMenu.classList.toggle('hidden');
+        }
+
+        document.addEventListener('click', function(event) {
+            const button = exportMenu.previousElementSibling;
+            if (!exportMenu.contains(event.target) && !button.contains(event.target)) {
+                exportMenu.classList.add('hidden');
+            }
+        });
+
+        // Todos los métodos de exportación ahora usan los datos filtrados
         function exportToCSV() {
-            const visibleExpenses = expenses.filter(e => !e.isDeleted);
+            toggleExportMenu();
+            const visibleExpenses = getFilteredExpenses();
             if (visibleExpenses.length === 0) return alert("No hay datos para exportar.");
             let csvContent = "Fecha,Categoria,Descripcion,Monto\n";
             visibleExpenses.forEach(row => {
@@ -409,7 +523,157 @@
             link.href = URL.createObjectURL(blob); link.download = `Mis_Gastos_${new Date().toISOString().split('T')[0]}.csv`; link.click();
         }
 
-        // --- 7. LÓGICA DE INSTALACIÓN PWA (BOTÓN PERSONALIZADO) ---
+        function exportToJSON() {
+            toggleExportMenu();
+            const visibleExpenses = getFilteredExpenses();
+            if (visibleExpenses.length === 0) return alert("No hay datos para exportar.");
+            
+            const dataStr = JSON.stringify(visibleExpenses, null, 2);
+            const blob = new Blob([dataStr], { type: "application/json" });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `Mis_Gastos_${new Date().toISOString().split('T')[0]}.json`;
+            link.click();
+        }
+
+        function exportToPDF() {
+            toggleExportMenu();
+            const visibleExpenses = getFilteredExpenses();
+            if (visibleExpenses.length === 0) return alert("No hay datos para exportar.");
+
+            const sortedExpenses = [...visibleExpenses].sort((a, b) => new Date(b.date) - new Date(a.date));
+
+            const element = document.createElement('div');
+            element.style.padding = '20px';
+            element.innerHTML = `
+                <h2 style="font-family: sans-serif; color: #4f46e5; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px;">Reporte de Gastos Personales</h2>
+                <p style="font-family: sans-serif; color: #64748b; font-size: 12px; margin-bottom: 20px;">Generado el: ${new Date().toLocaleDateString('es-ES')}</p>
+                <table style="width: 100%; border-collapse: collapse; font-family: sans-serif; font-size: 14px;">
+                    <tr style="background-color: #f8fafc; text-align: left;">
+                        <th style="padding: 10px; border-bottom: 2px solid #cbd5e1;">Fecha</th>
+                        <th style="padding: 10px; border-bottom: 2px solid #cbd5e1;">Categoría</th>
+                        <th style="padding: 10px; border-bottom: 2px solid #cbd5e1;">Descripción</th>
+                        <th style="padding: 10px; border-bottom: 2px solid #cbd5e1; text-align: right;">Monto</th>
+                    </tr>
+                    ${sortedExpenses.map(e => `
+                        <tr>
+                            <td style="padding: 10px; border-bottom: 1px solid #f1f5f9;">${new Date(e.date + 'T00:00:00').toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' })}</td>
+                            <td style="padding: 10px; border-bottom: 1px solid #f1f5f9;">${e.category}</td>
+                            <td style="padding: 10px; border-bottom: 1px solid #f1f5f9;">${e.description}</td>
+                            <td style="padding: 10px; border-bottom: 1px solid #f1f5f9; text-align: right;">${formatter.format(e.amount)}</td>
+                        </tr>
+                    `).join('')}
+                </table>
+                <h3 style="font-family: sans-serif; text-align: right; margin-top: 20px; color: #1e293b;">Total Calculado: ${document.getElementById('totalAmount').textContent}</h3>
+            `;
+
+            const opt = {
+                margin:       15,
+                filename:     `Reporte_Gastos_${new Date().toISOString().split('T')[0]}.pdf`,
+                image:        { type: 'jpeg', quality: 0.98 },
+                html2canvas:  { scale: 2 },
+                jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+            };
+
+            html2pdf().set(opt).from(element).save();
+        }
+
+        // NUEVO: Funciones para manejar el Menú Flotante de Compartir
+        function openShareModal() {
+            toggleExportMenu(); // Cierra el menú desplegable pequeño
+            document.getElementById('shareModal').classList.remove('hidden');
+        }
+
+        function closeShareModal() {
+            document.getElementById('shareModal').classList.add('hidden');
+        }
+
+        // NUEVO: Lógica unificada para generar el archivo deseado y compartirlo
+        async function executeShare(format) {
+            closeShareModal();
+            const visibleExpenses = getFilteredExpenses();
+            if (visibleExpenses.length === 0) return alert("No hay datos para compartir.");
+
+            let total = 0;
+            visibleExpenses.forEach(e => total += e.amount);
+
+            const textToShare = `Resumen de Gastos:\nTotal registrado: ${formatter.format(total)}\nRegistros: ${visibleExpenses.length}\n\nSe adjunta archivo generado vía App Mis Gastos.`;
+            const fileNameBase = `Mis_Gastos_${new Date().toISOString().split('T')[0]}`;
+            let fileToShare;
+
+            try {
+                if (format === 'txt') {
+                    const dataStr = JSON.stringify(visibleExpenses, null, 2);
+                    fileToShare = new File([dataStr], `${fileNameBase}.txt`, { type: "text/plain" });
+                } 
+                else if (format === 'csv') {
+                    let csvContent = "Fecha,Categoria,Descripcion,Monto\n";
+                    visibleExpenses.forEach(row => {
+                        csvContent += `${row.date},${row.category},"${row.description.replace(/"/g, '""')}",${row.amount}\n`;
+                    });
+                    fileToShare = new File([csvContent], `${fileNameBase}.csv`, { type: "text/csv" });
+                } 
+                else if (format === 'pdf') {
+                    const sortedExpenses = [...visibleExpenses].sort((a, b) => new Date(b.date) - new Date(a.date));
+                    const element = document.createElement('div');
+                    element.style.padding = '20px';
+                    element.innerHTML = `
+                        <h2 style="font-family: sans-serif; color: #4f46e5; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px;">Reporte de Gastos Personales</h2>
+                        <table style="width: 100%; border-collapse: collapse; font-family: sans-serif; font-size: 14px; margin-top: 15px;">
+                            <tr style="background-color: #f8fafc; text-align: left;">
+                                <th style="padding: 10px; border-bottom: 2px solid #cbd5e1;">Fecha</th>
+                                <th style="padding: 10px; border-bottom: 2px solid #cbd5e1;">Categoría</th>
+                                <th style="padding: 10px; border-bottom: 2px solid #cbd5e1;">Descripción</th>
+                                <th style="padding: 10px; border-bottom: 2px solid #cbd5e1; text-align: right;">Monto</th>
+                            </tr>
+                            ${sortedExpenses.map(e => `
+                                <tr>
+                                    <td style="padding: 10px; border-bottom: 1px solid #f1f5f9;">${new Date(e.date + 'T00:00:00').toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' })}</td>
+                                    <td style="padding: 10px; border-bottom: 1px solid #f1f5f9;">${e.category}</td>
+                                    <td style="padding: 10px; border-bottom: 1px solid #f1f5f9;">${e.description}</td>
+                                    <td style="padding: 10px; border-bottom: 1px solid #f1f5f9; text-align: right;">${formatter.format(e.amount)}</td>
+                                </tr>
+                            `).join('')}
+                        </table>
+                        <h3 style="font-family: sans-serif; text-align: right; margin-top: 20px; color: #1e293b;">Total Calculado: ${document.getElementById('totalAmount').textContent}</h3>
+                    `;
+
+                    const opt = {
+                        margin: 15, filename: `${fileNameBase}.pdf`,
+                        image: { type: 'jpeg', quality: 0.98 }, html2canvas: { scale: 2 },
+                        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+                    };
+                    
+                    // Esperar a que la librería genere el blob del PDF en segundo plano
+                    const pdfBlob = await html2pdf().set(opt).from(element).outputPdf('blob');
+                    fileToShare = new File([pdfBlob], `${fileNameBase}.pdf`, { type: "application/pdf" });
+                }
+
+                // Intentar enviar a través del menú nativo
+                const shareData = { title: 'Mi Resumen de Gastos', text: textToShare };
+
+                if (navigator.canShare && navigator.canShare({ files: [fileToShare] })) {
+                    shareData.files = [fileToShare];
+                } else {
+                    console.log("El dispositivo no permite adjuntar archivos en este formato. Se enviará solo el texto.");
+                }
+
+                if (navigator.share) {
+                    await navigator.share(shareData);
+                } else {
+                    alert("Tu dispositivo actual no soporta la función de compartir nativa.");
+                }
+
+            } catch (err) {
+                console.error("Error al compartir el archivo:", err);
+                if (err.name !== 'AbortError') { // Ignoramos el error si el usuario simplemente canceló el menú
+                    alert("Ocurrió un error al preparar el archivo para compartir.");
+                }
+            }
+        }
+
+        // --- 8. LÓGICA DE INSTALACIÓN PWA (BOTÓN PERSONALIZADO) ---
         let deferredPrompt = null;
         window.addEventListener('beforeinstallprompt', (e) => {
             e.preventDefault(); 
@@ -422,9 +686,8 @@
                 const { outcome } = await deferredPrompt.userChoice;
                 if (outcome === 'accepted') console.log('PWA aceptada');
                 deferredPrompt = null; 
-                installAppBtn.classList.add('hidden'); // Ocultar si la instalación fue exitosa
+                installAppBtn.classList.add('hidden');
             } else {
-                // Mostrar alerta visual si se intenta instalar desde la vista previa o entorno local
                 document.getElementById('customAlert').classList.remove('hidden');
             }
         });
@@ -433,7 +696,7 @@
             installAppBtn.classList.add('hidden'); deferredPrompt = null;
         });
 
-        // --- 8. REGISTRO DE SERVICE WORKER REAL ---
+        // --- 9. REGISTRO DE SERVICE WORKER REAL ---
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
                 if (window.location.protocol === 'http:' || window.location.protocol === 'https:') {
@@ -441,7 +704,7 @@
                         .then(reg => console.log('SW registrado', reg.scope))
                         .catch(err => console.error('Error SW', err));
                 } else {
-                    console.log('SW omitido: el protocolo actual (' + window.location.protocol + ') no soporta Service Workers. Funcionará correctamente al subirlo a GitHub Pages.');
+                    console.log('SW omitido: el protocolo actual (' + window.location.protocol + ') no soporta Service Workers.');
                 }
             });
         }
